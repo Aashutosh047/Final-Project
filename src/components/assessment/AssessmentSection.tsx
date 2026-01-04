@@ -22,6 +22,9 @@ const steps = [
   { id: 4, title: "Your Report", description: "Personalized results" },
 ];
 
+// API Configuration
+const API_BASE_URL = "http://localhost:8000"; // Update this to your backend URL
+
 export function AssessmentSection() {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
@@ -32,6 +35,75 @@ export function AssessmentSection() {
     questionnaire: initialQuestionnaire,
     images: [],
   });
+
+  // Function to send user details to backend
+  const sendUserDetailsToBackend = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/user-details`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: data.userDetails.name,
+          email: data.userDetails.email,
+          age: parseInt(data.userDetails.age),
+          gender: data.userDetails.gender,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send user details");
+      }
+
+      const result = await response.json();
+      console.log("User details sent successfully:", result);
+      
+      toast({
+        title: "Success",
+        description: "Your details have been saved",
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Error sending user details:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save your details. Please try again.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  // Function to send questionnaire to backend
+  const sendQuestionnaireToBackend = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/questionnaire`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data.questionnaire),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send questionnaire");
+      }
+
+      const result = await response.json();
+      console.log("Questionnaire sent successfully:", result);
+      return true;
+    } catch (error) {
+      console.error("Error sending questionnaire:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save questionnaire. Please try again.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
 
   const validateStep = (step: number): boolean => {
     switch (step) {
@@ -58,7 +130,6 @@ export function AssessmentSection() {
         }
         return true;
       case 3:
-        // Images are optional but recommended
         return true;
       default:
         return true;
@@ -68,16 +139,31 @@ export function AssessmentSection() {
   const handleNext = async () => {
     if (!validateStep(currentStep)) return;
 
-    if (currentStep === 3) {
+    // Send data to backend when moving to next step
+    if (currentStep === 1) {
+      setIsSubmitting(true);
+      const success = await sendUserDetailsToBackend();
+      setIsSubmitting(false);
+      
+      if (!success) return; // Don't proceed if sending failed
+      
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      setIsSubmitting(true);
+      const success = await sendQuestionnaireToBackend();
+      setIsSubmitting(false);
+      
+      if (!success) return;
+      
+      setCurrentStep(3);
+    } else if (currentStep === 3) {
       // Generate report
       setIsSubmitting(true);
-      await new Promise((resolve) => setTimeout(resolve, 1500)); // Simulate processing
+      await new Promise((resolve) => setTimeout(resolve, 1500));
       const generatedReport = generateReport(data.questionnaire);
       setReport(generatedReport);
       setIsSubmitting(false);
       setCurrentStep(4);
-    } else {
-      setCurrentStep((prev) => prev + 1);
     }
   };
 
@@ -189,7 +275,7 @@ export function AssessmentSection() {
               <Button
                 variant="ghost"
                 onClick={handleBack}
-                disabled={currentStep === 1}
+                disabled={currentStep === 1 || isSubmitting}
                 className="gap-2"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -202,7 +288,7 @@ export function AssessmentSection() {
                 className="gap-2"
               >
                 {isSubmitting ? (
-                  "Generating Report..."
+                  currentStep === 3 ? "Generating Report..." : "Saving..."
                 ) : currentStep === 3 ? (
                   <>
                     Generate Report
